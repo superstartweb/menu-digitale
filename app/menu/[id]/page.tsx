@@ -80,6 +80,7 @@ export default function PublicMenu() {
         <h1 className="text-3xl font-bold text-slate-700 tracking-tight">{venue.name}</h1>
       </header>
 
+      {/* NAV PRINCIPALE */}
       <nav className="flex justify-around bg-white border-b sticky top-0 z-20 shadow-sm">
         {hasWines && (
           <button onClick={() => setActiveTab('wine')} className={`flex-1 py-4 text-xs font-bold tracking-widest transition ${activeTab === 'wine' ? 'text-red-900 border-b-2 border-red-900' : 'text-gray-400'}`}>CARTA VINI</button>
@@ -106,15 +107,15 @@ export default function PublicMenu() {
         </div>
       </div>
 
-      {/* SOTTO-NAVIGAZIONE A PILLOLA */}
+      {/* SOTTO-NAVIGAZIONE A PILLOLA - FIX SCORRIMENTO MOBILE */}
       <div className="sticky top-[61px] z-20 bg-white border-b shadow-sm overflow-x-auto no-scrollbar">
-        <div className="flex justify-center gap-2 p-4">
+        <div className="flex justify-start gap-2 p-4 px-4"> 
           {activeTab === 'wine' ? (
             wineCategories.map(cat => (
               <button 
                 key={cat.id} 
                 onClick={() => setActiveWineCat(cat.name)}
-                className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition border ${activeWineCat === cat.name ? 'bg-red-900 text-white border-red-900' : 'bg-white text-slate-500 border-slate-200'}`}
+                className={`flex-none px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition border ${activeWineCat === cat.name ? 'bg-red-900 text-white border-red-900' : 'bg-white text-slate-500 border-slate-200'}`}
               >
                 {cat.name}
               </button>
@@ -124,7 +125,7 @@ export default function PublicMenu() {
               <button 
                 key={section.id} 
                 onClick={() => setActiveSectionId(section.id)}
-                className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition border ${activeSectionId === section.id ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200'}`}
+                className={`flex-none px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition border ${activeSectionId === section.id ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200'}`}
               >
                 {section.name}
               </button>
