@@ -9,8 +9,9 @@ export default function PublicMenu() {
 
   const [venue, setVenue] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'food' | 'drink' | 'wine'>('food');
-  const [activeWineCat, setActiveWineCat] = useState<string>(''); // NUOVO: Tab per la categoria vino
+  // Ora il default è 'wine' per dare priorità alla carta vini
+  const [activeTab, setActiveTab] = useState<'food' | 'drink' | 'wine'>('wine');
+  const [activeWineCat, setActiveWineCat] = useState<string>('');
   
   const [menuData, setMenuData] = useState<{sections: any[], items: any[]}>({ sections: [], items: [] });
   const [wineData, setWineData] = useState<any[]>([]);
@@ -35,12 +36,11 @@ export default function PublicMenu() {
         const { data: a } = await supabase.from('sm_allergens').select('*').order('id');
         setAllergens(a || []);
 
-        // Imposta la prima categoria di vino disponibile come predefinita
         if (w && w.length > 0) {
           setActiveWineCat(w[0].category);
         }
       } catch (e) {
-        console.error("Errore caricamento:", e);
+        console.error("Errore:", e);
       } finally {
         setLoading(false);
       }
@@ -55,14 +55,13 @@ export default function PublicMenu() {
   const hasDrinks = menuData.sections.some(s => s.type === 'drink');
   const hasWines = wineData.length > 0;
 
-  // Estraiamo le categorie uniche di vini presenti per creare i tab
   const wineCategories = Array.from(new Set(wineData.map(vw => vw.category))).sort();
 
   const goToRecommendedWine = (wineId: string) => {
     const wine = wineData.find(vw => vw.sm_master_wines?.id === wineId);
     if (wine) {
       setActiveTab('wine');
-      setActiveWineCat(wine.category); // Cambia anche la sotto-categoria!
+      setActiveWineCat(wine.category);
       setTimeout(() => {
         const element = document.getElementById(`wine-${wineId}`);
         element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -79,20 +78,19 @@ export default function PublicMenu() {
         <h1 className="text-3xl font-bold text-slate-700 tracking-tight">{venue.name}</h1>
       </header>
 
-      {/* NAVIGAZIONE PRINCIPALE */}
+      {/* NAVIGAZIONE PRINCIPALE - ORDINE CAMBIARE: VINI PRIMA */}
       <nav className="flex justify-around bg-white border-b sticky top-0 z-20 shadow-sm">
+        {hasWines && (
+          <button onClick={() => setActiveTab('wine')} className={`flex-1 py-4 text-xs font-bold tracking-widest transition ${activeTab === 'wine' ? 'text-red-900 border-b-2 border-red-900' : 'text-gray-400'}`}>CARTA VINI</button>
+        )}
         {hasFood && (
-          <button onClick={() => setActiveTab('food')} className={`flex-1 py-4 text-xs font-bold tracking-widest transition ${activeTab === 'food' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-gray-400'}`}>MENÙ</button>
+          <button onClick={() => setActiveTab('food')} className={`flex-1 py-4 text-xs font-bold tracking-widest transition ${activeTab === 'food' ? 'text-red-900 border-b-2 border-red-900' : 'text-gray-400'}`}>MENÙ</button>
         )}
         {hasDrinks && (
-          <button onClick={() => setActiveTab('drink')} className={`flex-1 py-4 text-xs font-bold tracking-widest transition ${activeTab === 'drink' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-gray-400'}`}>DRINK</button>
-        )}
-        {hasWines && (
-          <button onClick={() => setActiveTab('wine')} className={`flex-1 py-4 text-xs font-bold tracking-widest transition ${activeTab === 'wine' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-gray-400'}`}>CARTA VINI</button>
+          <button onClick={() => setActiveTab('drink')} className={`flex-1 py-4 text-xs font-bold tracking-widest transition ${activeTab === 'drink' ? 'text-red-900 border-b-2 border-red-900' : 'text-gray-400'}`}>DRINK</button>
         )}
       </nav>
 
-      {/* SOTTO-NAVIGAZIONE VINI (Appare solo se siamo in tab 'wine') */}
       {activeTab === 'wine' && (
         <div className="flex overflow-x-auto bg-white border-b sticky top-[61px] z-20 no-scrollbar shadow-sm">
           {wineCategories.map(cat => (
@@ -112,23 +110,40 @@ export default function PublicMenu() {
           <div className="space-y-12 mt-6">
             {menuData.sections.filter(s => s.type === activeTab).map(section => (
               <div key={section.id} className="space-y-6">
-                <h2 className="text-xl font-bold text-slate-700 text-center uppercase tracking-widest border-b border-gray-100 pb-2">{section.name}</h2>
-                <div className="grid gap-8">
+                {/* SEZIONE MODERNA A "PILLOLA" */}
+                <div className="flex justify-center mb-8">
+                  <span className="px-6 py-2 rounded-full bg-slate-100 text-slate-700 text-sm font-bold uppercase tracking-widest border border-slate-200 shadow-sm">
+                    {section.name}
+                  </span>
+                </div>
+                
+                {/* PIATTI A SCHEDA (Card Layout) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {menuData.items.filter(item => item.section_id === section.id).map(item => {
                     const recommendedWine = wineData.find(vw => vw.sm_master_wines?.id === item.recommended_wine_id);
                     return (
-                      <div key={item.id} className="flex justify-between items-start gap-4">
-                        <div className="flex-1">
-                          <h3 className="font-bold text-lg text-slate-900">{item.name_it}</h3>
-                          <p className="text-sm text-gray-500 italic">{item.name_en}</p>
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            <button onClick={() => setShowAllergens(true)} className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{item.allergens || 'Nessuno'}</button>
+                      <div key={item.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between h-full">
+                        <div>
+                          <div className="flex justify-between items-start mb-2">
+                            <h3 className="font-bold text-lg text-slate-900 leading-tight">{item.name_it}</h3>
+                            <span className="font-serif font-bold text-lg text-red-900 ml-2">€ {item.price}</span>
+                          </div>
+                          <p className="text-sm text-gray-500 italic mb-4">{item.name_en}</p>
+                          
+                          <div className="flex flex-wrap gap-2">
+                            <button onClick={() => setShowAllergens(true)} className="text-[10px] bg-gray-50 text-gray-400 px-2 py-1 rounded-md border border-gray-100">
+                              Allergeni: {item.allergens || 'Nessuno'}
+                            </button>
                             {recommendedWine && (
-                              <button onClick={() => goToRecommendedWine(item.recommended_wine_id)} className="text-[10px] bg-red-50 text-red-800 px-2 py-0.5 rounded-full border border-red-100 font-bold">🍷 {recommendedWine.sm_master_wines.name}</button>
+                              <button 
+                                onClick={() => goToRecommendedWine(item.recommended_wine_id)}
+                                className="text-[10px] bg-red-50 text-red-800 px-2 py-1 rounded-md border border-red-100 font-bold hover:bg-red-100 transition"
+                              >
+                                🍷 {recommendedWine.sm_master_wines.name}
+                              </button>
                             )}
                           </div>
                         </div>
-                        <span className="font-bold text-lg text-slate-900">€ {item.price}</span>
                       </div>
                     );
                   })}
@@ -140,7 +155,6 @@ export default function PublicMenu() {
 
         {activeTab === 'wine' && (
           <div className="mt-6">
-            {/* Mostra solo i vini della categoria selezionata */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-16">
               {wineData.filter(vw => vw.category === activeWineCat).map(vw => {
                 const wine = vw.sm_master_wines;
@@ -188,7 +202,7 @@ export default function PublicMenu() {
         )}
       </main>
 
-      {/* MODAL CANTINA e ALLERGENI (Invariati, mantenuti come nella versione precedente) */}
+      {/* MODALS (Rimangono uguali, già perfetti) */}
       {selectedWinery && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-md w-full max-h-[85vh] overflow-y-auto p-8 relative animate-in fade-in zoom-in duration-300 border-t-8 border-slate-800">
