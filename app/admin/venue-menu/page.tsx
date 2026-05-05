@@ -26,7 +26,6 @@ export default function VenueMenuPage() {
     position: 0 
   });
 
-  // 1. Caricamento dati iniziali (Locali e Vini Master)
   useEffect(() => { loadInitData(); }, []);
 
   async function loadInitData() {
@@ -36,21 +35,18 @@ export default function VenueMenuPage() {
     setMasterWines(mw || []);
   }
 
-  // 2. Carica le sezioni del locale selezionato
   async function loadMenuData(venueId: string) {
     if (!venueId) return;
     const { data } = await supabase.from('sm_menu_sections').select('*').eq('venue_id', venueId).order('position');
     setSections(data || []);
   }
 
-  // 3. Carica i piatti della sezione selezionata
   async function loadItemsForSection(sectionId: string) {
     if (!sectionId) { setItems([]); return; }
     const { data } = await supabase.from('sm_menu_items').select('*').eq('section_id', sectionId).order('position');
     setItems(data || []);
   }
 
-  // 4. Aggiungi nuova sezione (Primi, Secondi, ecc.)
   async function addSection(e: React.FormEvent) {
     e.preventDefault();
     const { error } = await supabase.from('sm_menu_sections').insert([
@@ -63,11 +59,16 @@ export default function VenueMenuPage() {
     }
   }
 
-  // 5. Gestione Salva/Modifica Piatto (Il cuore del fix!)
+  // --- FUNZIONE RIPRISTINATA: Gestione Posizione Sezioni ---
+  async function updateSectionPos(id: string, pos: number) {
+    const { error } = await supabase.from('sm_menu_sections').update({ position: pos }).eq('id', id);
+    if (error) alert('Errore aggiornamento posizione');
+    else loadMenuData(selectedVenue);
+  }
+
   async function handleSubmitItem(e: React.FormEvent) {
     e.preventDefault();
     
-    // Prepariamo i dati puliti per il database
     const data = { 
       name_it: itemForm.name_it,
       name_en: itemForm.name_en,
@@ -75,12 +76,10 @@ export default function VenueMenuPage() {
       allergens: itemForm.allergens,
       position: itemForm.position,
       section_id: selectedSection,
-      // FIX: Se il campo è vuoto, inviamo NULL, non una stringa vuota ""
       recommended_wine_id: itemForm.recommended_wine_id === '' ? null : itemForm.recommended_wine_id
     };
 
     if (editingItemId) {
-      // MODIFICA
       const { error } = await supabase.from('sm_menu_items').update(data).eq('id', editingItemId);
       if (error) alert('Errore modifica: ' + error.message);
       else { 
@@ -88,18 +87,15 @@ export default function VenueMenuPage() {
         setEditingItemId(null); 
       }
     } else {
-      // NUOVO
       const { error } = await supabase.from('sm_menu_items').insert([data]);
       if (error) alert('Errore inserimento: ' + error.message);
       else alert('Piatto inserito!');
     }
     
-    // Reset form
     setItemForm({ name_it: '', name_en: '', price: '', allergens: '', recommended_wine_id: '', position: 0 });
     loadItemsForSection(selectedSection);
   }
 
-  // 6. Carica un piatto nel form per modificarlo
   function startEdit(item: any) {
     setEditingItemId(item.id);
     setItemForm({
@@ -113,13 +109,11 @@ export default function VenueMenuPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  // 7. Aggiorna posizione piatto
   async function updateItemPosition(id: string, pos: number) {
     await supabase.from('sm_menu_items').update({ position: pos }).eq('id', id);
     loadItemsForSection(selectedSection);
   }
 
-  // 8. Elimina piatto
   async function deleteItem(id: string) {
     if (confirm('Eliminare questo piatto?')) {
       await supabase.from('sm_menu_items').delete().eq('id', id);
@@ -135,7 +129,6 @@ export default function VenueMenuPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* COLONNA 1: LOCALE E SEZIONI */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white p-6 rounded-xl shadow-sm border">
             <label className="block font-bold mb-2">1. Locale</label>
@@ -147,7 +140,7 @@ export default function VenueMenuPage() {
 
           {selectedVenue && (
             <div className="bg-white p-6 rounded-xl shadow-sm border">
-              <label className="block font-bold mb-2">2. Sezioni</label>
+              <label className="block font-bold mb-2">2. Sezioni (Ordine)</label>
               <form onSubmit={addSection} className="mb-4 flex flex-col gap-2">
                 <input className="border p-2 rounded text-black text-sm" placeholder="Nome Sezione" value={secName} onChange={(e) => setSecName(e.target.value)} required />
                 <select className="border p-2 rounded text-black text-sm" value={secType} onChange={(e) => setSecType(e.target.value as any)}>
@@ -158,8 +151,19 @@ export default function VenueMenuPage() {
               </form>
               <div className="space-y-2">
                 {sections.map(s => (
-                  <div key={s.id} onClick={() => { setSelectedSection(s.id); loadItemsForSection(s.id); }} className={`p-2 rounded cursor-pointer border transition ${selectedSection === s.id ? 'bg-blue-100 border-blue-500 font-bold' : 'bg-gray-50 hover:bg-gray-100'}`}>
-                    {s.type === 'food' ? '🥘' : '🍹'} {s.name}
+                  <div key={s.id} className="flex items-center gap-2 group">
+                    <input 
+                      type="number" 
+                      className="w-10 border p-1 rounded text-center text-black text-xs font-bold" 
+                      value={s.position} 
+                      onChange={(e) => updateSectionPos(s.id, parseInt(e.target.value))} 
+                    />
+                    <div 
+                      onClick={() => { setSelectedSection(s.id); loadItemsForSection(s.id); }} 
+                      className={`flex-1 p-2 rounded cursor-pointer border transition ${selectedSection === s.id ? 'bg-blue-100 border-blue-500 font-bold' : 'bg-gray-50 hover:bg-gray-100'}`}
+                    >
+                      {s.type === 'food' ? '🥘' : '🍹'} {s.name}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -167,7 +171,6 @@ export default function VenueMenuPage() {
           )}
         </div>
 
-        {/* COLONNA 2 & 3: GESTIONE PIATTI */}
         <div className="lg:col-span-3">
           {!selectedSection ? (
             <div className="h-full flex items-center justify-center text-gray-400 italic border-2 border-dashed rounded-xl p-20">Seleziona una sezione</div>
