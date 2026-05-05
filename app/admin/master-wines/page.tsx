@@ -36,10 +36,15 @@ export default function MasterWinesPage() {
     else { setNewCatName(''); loadData(); }
   }
 
+  async function updateCategoryPos(id: string, pos: number) {
+    const { error } = await supabase.from('sm_wine_categories').update({ position: pos }).eq('id', id);
+    if (error) alert('Errore posizione');
+    else loadData();
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    // Fix Virgola -> Punto per i decimali
     const dataToSave = {
       ...form,
       alcohol_percentage: form.alcohol_percentage?.toString().replace(',', '.')
@@ -86,10 +91,18 @@ export default function MasterWinesPage() {
       </div>
 
       <div className="mb-8 p-4 bg-slate-100 rounded-xl border flex flex-wrap items-center gap-4">
-        <span className="font-bold text-sm">Categorie:</span>
-        <div className="flex gap-2">
+        <span className="font-bold text-sm">Categorie (Posizione):</span>
+        <div className="flex flex-wrap gap-2">
           {categories.map(cat => (
-            <span key={cat.id} className="bg-white px-2 py-1 rounded border text-xs font-medium">{cat.name}</span>
+            <div key={cat.id} className="flex items-center bg-white px-2 py-1 rounded border gap-2 shadow-sm">
+              <input 
+                type="number" 
+                className="w-8 text-center text-xs font-bold border-r pr-1 text-black" 
+                value={cat.position} 
+                onChange={(e) => updateCategoryPos(cat.id, parseInt(e.target.value))} 
+              />
+              <span className="text-xs font-medium">{cat.name}</span>
+            </div>
           ))}
         </div>
         <div className="ml-auto flex gap-2">
@@ -116,7 +129,7 @@ export default function MasterWinesPage() {
         <input className="border p-2 rounded text-black" placeholder="Denominazione" value={form.denomination} onChange={(e) => setForm({...form, denomination: e.target.value})} />
         <input className="border p-2 rounded text-black" placeholder="Affinamento" value={form.aging} onChange={(e) => setForm({...form, aging: e.target.value})} />
         <input className="border p-2 rounded text-black" placeholder="Uvaggio" value={form.blend} onChange={(e) => setForm({...form, blend: e.target.value})} />
-        <input className="border p-2 rounded text-black" placeholder="Gradazione" value={form.alcohol_percentage} onChange={(e) => setForm({...form, alcohol_percentage: e.target.value})} />
+        <input className="border p-2 rounded text-black" placeholder="Gradazione (es. 13,5)" value={form.alcohol_percentage} onChange={(e) => setForm({...form, alcohol_percentage: e.target.value})} />
         <input className="border p-2 rounded text-black" placeholder="Filosofia" value={form.philosophy} onChange={(e) => setForm({...form, philosophy: e.target.value})} />
         <textarea className="border p-2 rounded text-black md:col-span-3" placeholder="Olfatto" value={form.smell_description} onChange={(e) => setForm({...form, smell_description: e.target.value})} />
         <textarea className="border p-2 rounded text-black md:col-span-3" placeholder="Gusto" value={form.taste_description} onChange={(e) => setForm({...form, taste_description: e.target.value})} />
