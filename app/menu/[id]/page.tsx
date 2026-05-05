@@ -11,7 +11,8 @@ export default function PublicMenu() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'food' | 'drink' | 'wine'>('wine');
   const [activeWineCat, setActiveWineCat] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState(''); // NUOVO: Stato per la ricerca
+  const [activeSectionId, setActiveSectionId] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
   
   const [menuData, setMenuData] = useState<{sections: any[], items: any[]}>({ sections: [], items: [] });
   const [wineData, setWineData] = useState<any[]>([]);
@@ -41,6 +42,7 @@ export default function PublicMenu() {
         setAllergens(a || []);
 
         if (cats && cats.length > 0) setActiveWineCat(cats[0].name);
+        if (s && s.length > 0) setActiveSectionId(s[0].id);
       } catch (e) {
         console.error("Errore:", e);
       } finally {
@@ -78,7 +80,6 @@ export default function PublicMenu() {
         <h1 className="text-3xl font-bold text-slate-700 tracking-tight">{venue.name}</h1>
       </header>
 
-      {/* NAV PRINCIPALE */}
       <nav className="flex justify-around bg-white border-b sticky top-0 z-20 shadow-sm">
         {hasWines && (
           <button onClick={() => setActiveTab('wine')} className={`flex-1 py-4 text-xs font-bold tracking-widest transition ${activeTab === 'wine' ? 'text-red-900 border-b-2 border-red-900' : 'text-gray-400'}`}>CARTA VINI</button>
@@ -91,21 +92,21 @@ export default function PublicMenu() {
         )}
       </nav>
 
-      {/* BARRA DI RICERCA MODERNA */}
+      {/* BARRA RICERCA */}
       <div className="px-4 py-6 max-w-md mx-auto">
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
           <input 
             type="text" 
             placeholder="Cerca un piatto, un vino..." 
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-red-100 transition"
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-red-100"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
       </div>
 
-      {/* SOTTO-NAVIGAZIONE UNIFICATA (Sempre a Pillole) */}
+      {/* SOTTO-NAVIGAZIONE A PILLOLA */}
       <div className="sticky top-[61px] z-20 bg-white border-b shadow-sm overflow-x-auto no-scrollbar">
         <div className="flex justify-center gap-2 p-4">
           {activeTab === 'wine' ? (
@@ -113,7 +114,7 @@ export default function PublicMenu() {
               <button 
                 key={cat.id} 
                 onClick={() => setActiveWineCat(cat.name)}
-                className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition border ${activeWineCat === cat.name ? 'bg-red-900 text-white border-red-900' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+                className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition border ${activeWineCat === cat.name ? 'bg-red-900 text-white border-red-900' : 'bg-white text-slate-500 border-slate-200'}`}
               >
                 {cat.name}
               </button>
@@ -123,7 +124,7 @@ export default function PublicMenu() {
               <button 
                 key={section.id} 
                 onClick={() => setActiveSectionId(section.id)}
-                className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition border ${activeSectionId === section.id ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+                className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition border ${activeSectionId === section.id ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200'}`}
               >
                 {section.name}
               </button>
@@ -132,22 +133,18 @@ export default function PublicMenu() {
         </div>
       </div>
 
-      <main className="p-4 max-w-4xl mx-auto">
+      <main className="p-4 max-w-2xl mx-auto">
         {(activeTab === 'food' || activeTab === 'drink') && (
           <div className="space-y-12 mt-6">
             {menuData.sections.filter(s => s.type === activeTab).map(section => {
-              // Filtriamo i piatti della sezione in base alla ricerca
               const filteredItems = menuData.items.filter(item => 
                 item.section_id === section.id && 
-                (item.name_it.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                 item.name_en.toLowerCase().includes(searchQuery.toLowerCase()))
+                (item.name_it.toLowerCase().includes(searchQuery.toLowerCase()) || item.name_en.toLowerCase().includes(searchQuery.toLowerCase()))
               );
-
               if (filteredItems.length === 0 && searchQuery !== '') return null;
 
               return (
                 <div key={section.id} className="space-y-6">
-                  {/* Mostra intestazione sezione solo se non stiamo filtrando o se è la sezione attiva */}
                   {(activeSectionId === section.id || searchQuery === '') && (
                     <div className="flex justify-center mb-8">
                       <span className="px-6 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest border border-slate-200">
@@ -155,8 +152,7 @@ export default function PublicMenu() {
                       </span>
                     </div>
                   )}
-                  
-                  <div className="grid gap-6">
+                  <div className="grid gap-8">
                     {filteredItems.map(item => {
                       const recommendedWine = wineData.find(vw => vw.sm_master_wines?.id === item.recommended_wine_id);
                       return (
@@ -169,7 +165,7 @@ export default function PublicMenu() {
                                 Allergeni: {item.allergens || 'Nessuno'}
                               </button>
                               {recommendedWine && (
-                                <button onClick={() => goToRecommendedWine(item.recommended_wine_id)} className="text-[10px] bg-red-50 text-red-800 px-2 py-0.5 rounded-md border border-red-100 font-bold hover:bg-red-100 transition">
+                                <button onClick={() => goToRecommendedWine(item.recommended_wine_id)} className="text-[10px] bg-red-50 text-red-800 px-2 py-0.5 rounded-md border border-red-100 font-bold">
                                   🍷 {recommendedWine.sm_master_wines.name}
                                 </button>
                               )}
@@ -191,8 +187,7 @@ export default function PublicMenu() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-16">
               {wineData.filter(vw => {
                 const matchesCat = vw.category === activeWineCat;
-                const matchesSearch = vw.sm_master_wines?.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                    vw.sm_master_wines?.region.toLowerCase().includes(searchQuery.toLowerCase());
+                const matchesSearch = vw.sm_master_wines?.name.toLowerCase().includes(searchQuery.toLowerCase()) || vw.sm_master_wines?.region.toLowerCase().includes(searchQuery.toLowerCase());
                 return matchesCat && matchesSearch;
               }).map(vw => {
                 const wine = vw.sm_master_wines;
@@ -240,7 +235,6 @@ export default function PublicMenu() {
         )}
       </main>
 
-      {/* MODALS e FOOTER (Invariati per coerenza) */}
       {selectedWinery && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-md w-full max-h-[85vh] overflow-y-auto p-8 relative animate-in fade-in zoom-in duration-300 border-t-8 border-slate-800">
