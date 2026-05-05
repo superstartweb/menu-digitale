@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 const adminModules = [
   { name: 'Gestione Locali', path: '/admin/venues', icon: '🏢', desc: 'Crea e attiva i locali' },
+  { name: 'Gestione Cantine', path: '/admin/wineries', icon: '🍇', desc: 'Crea e gestisci le cantine' },
   { name: 'Enciclopedia Vini', path: '/admin/master-wines', icon: '📖', desc: 'Gestisci l\'archivio globale' },
   { name: 'Associazione Vini', path: '/admin/venue-wines', icon: '🍷', desc: 'Assegna vini e prezzi ai locali' },
   { name: 'Menù e Drink', path: '/admin/venue-menu', icon: '🍽️', desc: 'Crea sezioni e piatti' },
@@ -33,7 +34,6 @@ export default function AdminDashboard() {
           </Link>
         ))}
       </div>
-
       <footer className="mt-20 text-center text-gray-400 text-xs">
         SuPeR HO.RE.CA. Edition &copy; {new Date().getFullYear()}
       </footer>
