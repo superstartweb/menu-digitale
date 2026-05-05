@@ -32,8 +32,17 @@ export default function PublicMenu() {
         const { data: i } = await supabase.from('sm_menu_items').select('*').order('position');
         setMenuData({ sections: s || [], items: i || [] });
 
-        const { data: w } = await supabase.from('sm_venue_wines').select('*, sm_master_wines(*, sm_wineries(*))').eq('venue_id', venueId).order('position');
-        setWineData(w || []);
+        const { data: w } = await supabase.from('sm_venue_wines').select('*, sm_master_wines(*, sm_wineries(*))').eq('venue_id', venueId);
+        
+        // ORDINAMENTO: Prima per Cantina, poi per Posizione
+        const sortedWines = (w || []).sort((a, b) => {
+          const wineryA = a.sm_master_wines?.sm_wineries?.name || '';
+          const wineryB = b.sm_master_wines?.sm_wineries?.name || '';
+          if (wineryA < wineryB) return -1;
+          if (wineryA > wineryB) return 1;
+          return (a.position || 0) - (b.position || 0);
+        });
+        setWineData(sortedWines);
 
         const { data: cats } = await supabase.from('sm_wine_categories').select('*').order('position');
         setWineCategories(cats || []);
@@ -80,7 +89,6 @@ export default function PublicMenu() {
         <h1 className="text-3xl font-bold text-slate-700 tracking-tight">{venue.name}</h1>
       </header>
 
-      {/* NAV PRINCIPALE */}
       <nav className="flex justify-around bg-white border-b sticky top-0 z-20 shadow-sm">
         {hasWines && (
           <button onClick={() => setActiveTab('wine')} className={`flex-1 py-4 text-xs font-bold tracking-widest transition ${activeTab === 'wine' ? 'text-red-900 border-b-2 border-red-900' : 'text-gray-400'}`}>CARTA VINI</button>
@@ -93,7 +101,6 @@ export default function PublicMenu() {
         )}
       </nav>
 
-      {/* BARRA RICERCA */}
       <div className="px-4 py-6 max-w-md mx-auto">
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
@@ -107,9 +114,8 @@ export default function PublicMenu() {
         </div>
       </div>
 
-      {/* SOTTO-NAVIGAZIONE A PILLOLA - FIX SCORRIMENTO MOBILE */}
       <div className="sticky top-[61px] z-20 bg-white border-b shadow-sm overflow-x-auto no-scrollbar">
-        <div className="flex justify-start gap-2 p-4 px-4"> 
+        <div className="flex justify-start gap-2 p-4 px-4">
           {activeTab === 'wine' ? (
             wineCategories.map(cat => (
               <button 
