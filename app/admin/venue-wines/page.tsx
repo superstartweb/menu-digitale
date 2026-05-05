@@ -31,7 +31,7 @@ export default function VenueWinesPage() {
   }
 
   async function associateWine(wine: any) {
-    const price = prompt(`Inserisci il prezzo per ${wine.name} nel locale:`);
+    const price = prompt(`Prezzo per ${wine.name}:`);
     if (price === null) return;
 
     const { error } = await supabase.from('sm_venue_wines').upsert({
@@ -46,14 +46,11 @@ export default function VenueWinesPage() {
     else loadVenueWines(selectedVenue);
   }
 
-  // FUNZIONE MODIFICA PREZZO IN TEMPO REALE
   async function updatePrice(id: string, newPrice: string) {
     const numericPrice = parseFloat(newPrice.replace(',', '.'));
     if (isNaN(numericPrice)) return;
-
-    const { error } = await supabase.from('sm_venue_wines').update({ price: numericPrice }).eq('id', id);
-    if (error) alert('Errore aggiornamento prezzo');
-    else loadVenueWines(selectedVenue);
+    await supabase.from('sm_venue_wines').update({ price: numericPrice }).eq('id', id);
+    // Non ricarichiamo tutto per evitare sfarfallio, aggiorniamo solo lo stato locale se necessario
   }
 
   async function toggleAvailability(id: string, current: boolean) {
@@ -62,40 +59,42 @@ export default function VenueWinesPage() {
   }
 
   async function dissociateWine(id: string) {
-    if (confirm('Rimuovere questo vino dalla carta di questo locale?')) {
+    if (confirm('Rimuovere questo vino dalla carta?')) {
       await supabase.from('sm_venue_wines').delete().eq('id', id);
       loadVenueWines(selectedVenue);
     }
   }
 
   const filteredMaster = masterWines.filter(w => w.name.toLowerCase().includes(searchWine.toLowerCase()));
+  const categories = ['Bollicine', 'Bianchi', 'Rosé/Orange', 'Rossi', 'Dolci/Passiti'];
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Associazione Vini 🍷</h1>
-        <button onClick={() => window.history.back()} className="text-blue-600 font-bold text-sm">← Torna Dashboard</button>
+        <h1 className="text-3xl font-bold">Wine Manager Pro 🍷</h1>
+        <button onClick={() => window.history.back()} className="text-blue-600 font-bold text-sm">← Dashboard</button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        {/* PANEL SINISTRO: SELEZIONE E AGGIUNTA */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <label className="block font-bold mb-2">1. Scegli il Locale</label>
-            <select className="w-full border p-2 rounded text-black" value={selectedVenue} onChange={(e) => { setSelectedVenue(e.target.value); loadVenueWines(e.target.value); }}>
-              <option value="">-- Seleziona Locale --</option>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border">
+            <label className="block font-bold mb-2 text-sm uppercase text-gray-500">1. Locale</label>
+            <select className="w-full border p-2 rounded-lg text-black font-medium" value={selectedVenue} onChange={(e) => { setSelectedVenue(e.target.value); loadVenueWines(e.target.value); }}>
+              <option value="">-- Seleziona --</option>
               {venues.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
           </div>
 
           {selectedVenue && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border">
-              <label className="block font-bold mb-2">2. Aggiungi Vino dal Master</label>
-              <input type="text" placeholder="Cerca vino nel master..." className="w-full border p-2 rounded mb-4 text-black" onChange={(e) => setSearchWine(e.target.value)} />
+            <div className="bg-white p-6 rounded-2xl shadow-sm border">
+              <label className="block font-bold mb-2 text-sm uppercase text-gray-500">2. Aggiungi dal Master</label>
+              <input type="text" placeholder="Cerca vino..." className="w-full border p-2 rounded-lg mb-4 text-black text-sm" onChange={(e) => setSearchWine(e.target.value)} />
               <div className="max-h-96 overflow-y-auto space-y-2">
                 {filteredMaster.map(wine => (
-                  <div key={wine.id} className="flex justify-between items-center p-2 hover:bg-gray-50 border rounded group">
-                    <span className="text-sm">{wine.name}</span>
-                    <button onClick={() => associateWine(wine)} className="bg-blue-500 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition">+ Aggiungi</button>
+                  <div key={wine.id} className="flex justify-between items-center p-2 hover:bg-gray-50 border rounded-lg group transition">
+                    <span className="text-xs font-medium">{wine.name}</span>
+                    <button onClick={() => associateWine(wine)} className="bg-blue-600 text-white px-2 py-1 rounded-md text-[10px] opacity-0 group-hover:opacity-100 transition">Add</button>
                   </div>
                 ))}
               </div>
@@ -103,41 +102,57 @@ export default function VenueWinesPage() {
           )}
         </div>
 
-        <div className="lg:col-span-2">
+        {/* PANEL DESTRO: GRID DI GESTIONE */}
+        <div className="lg:col-span-3">
           {!selectedVenue ? (
-            <div className="h-full flex items-center justify-center text-gray-400 italic border-2 border-dashed rounded-xl p-20">Seleziona un locale</div>
+            <div className="h-full flex items-center justify-center text-gray-400 italic border-2 border-dashed rounded-2xl p-20">Seleziona un locale per gestire la carta vini</div>
           ) : (
-            <div className="bg-white p-6 rounded-xl shadow-sm border">
-              <h2 className="text-xl font-bold mb-6">Vini associati al locale</h2>
-              <div className="space-y-4">
-                {venueWines.map(vw => (
-                  <div key={vw.id} className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
-                    <div className="flex items-center gap-4">
-                      <img src={vw.sm_master_wines?.image_url} className="w-8 h-12 object-contain" />
-                      <div>
-                        <span className="font-bold block">{vw.sm_master_wines?.name}</span>
-                        <span className="text-xs text-gray-500">{vw.category} • {vw.sm_master_wines?.region}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold">€</span>
-                        <input 
-                          type="text" 
-                          className="w-20 border p-1 rounded text-center text-black font-bold" 
-                          value={vw.price} 
-                          onChange={(e) => updatePrice(vw.id, e.target.value)}
-                          onBlur={(e) => updatePrice(vw.id, e.target.value)}
-                        />
-                      </div>
-                      <button onClick={() => toggleAvailability(vw.id, vw.is_available)} className={`px-3 py-1 rounded-full text-xs font-bold ${vw.is_available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {vw.is_available ? 'Disponibile' : 'Esaurito'}
-                      </button>
-                      <button onClick={() => dissociateWine(vw.id)} className="text-red-400 hover:text-red-600">🗑️</button>
+            <div className="space-y-12">
+              {categories.map(cat => {
+                const winesInCat = venueWines.filter(vw => vw.category === cat);
+                if (winesInCat.length === 0) return null;
+
+                return (
+                  <div key={cat} className="space-y-4">
+                    <h2 className="text-xl font-bold text-slate-700 border-b pb-2 flex items-center gap-2">
+                      <span className="w-2 h-6 bg-red-900 rounded-full"></span> {cat}
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {winesInCat.map(vw => (
+                        <div key={vw.id} className={`p-4 rounded-2xl border transition shadow-sm flex flex-col justify-between ${vw.is_available ? 'bg-white border-gray-100' : 'bg-gray-50 border-gray-200 opacity-75'}`}>
+                          <div className="text-center mb-4">
+                            <img src={vw.sm_master_wines?.image_url} className="h-24 mx-auto object-contain mb-2" />
+                            <h3 className="font-bold text-sm leading-tight mb-1">{vw.sm_master_wines?.name}</h3>
+                            <p className="text-[10px] text-gray-400 uppercase">{vw.sm_master_wines?.sm_wineries?.name}</p>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between bg-gray-50 p-2 rounded-lg border">
+                              <span className="text-xs font-bold text-gray-500">€</span>
+                              <input 
+                                type="text" 
+                                className="w-full text-right bg-transparent font-bold text-sm outline-none" 
+                                value={vw.price} 
+                                onChange={(e) => updatePrice(vw.id, e.target.value)} 
+                              />
+                            </div>
+                            
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => toggleAvailability(vw.id, vw.is_available)}
+                                className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition ${vw.is_available ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}
+                              >
+                                {vw.is_available ? 'Sì' : 'No'}
+                              </button>
+                              <button onClick={() => dissociateWine(vw.id)} className="p-1.5 bg-gray-100 text-gray-400 rounded-lg hover:text-red-600 transition">🗑️</button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           )}
         </div>
