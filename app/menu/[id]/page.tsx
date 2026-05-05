@@ -6,34 +6,46 @@ import { supabase } from '@/lib/supabase';
 export default function PublicMenu() {
   const params = useParams();
   const venueId = params.id;
+
   const [venue, setVenue] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'food' | 'drink' | 'wine'>('food');
+  
   const [menuData, setMenuData] = useState<{sections: any[], items: any[]}>({ sections: [], items: [] });
   const [wineData, setWineData] = useState<any[]>([]);
   const [allergens, setAllergens] = useState<any[]>([]);
+
   const [selectedWinery, setSelectedWinery] = useState<any>(null);
   const [showAllergens, setShowAllergens] = useState(false);
 
   useEffect(() => {
     async function loadAll() {
-      const { data: v } = await supabase.from('sm_venues').select('*').eq('id', venueId).single();
-      setVenue(v);
-      const { data: s } = await supabase.from('sm_//menu_sections').select('*').eq('venue_id', venueId).order('position');
-      const { data: i } = await supabase.from('sm_menu_items').select('*').order('position');
-      setMenuData({ sections: s || [], items: i || [] });
-      const { data: w } = await supabase.from('sm_venue_wines').select('*, sm_master_wines(*, sm_wineries(*))').eq('venue_id', venueId).order('position');
-      setWineData(w || []);
-      const { data: a } = await supabase.from('sm_allergens').select('*').order('id');
-      setAllergens(a || []);
-      setLoading(false);
+      try {
+        const { data: v } = await supabase.from('sm_venues').select('*').eq('id', venueId).single();
+        setVenue(v);
+
+        const { data: s } = await supabase.from('sm_menu_sections').select('*').eq('venue_id', venueId).order('position');
+        const { data: i } = await supabase.from('sm_menu_items').select('*').order('position');
+        setMenuData({ sections: s || [], items: i || [] });
+
+        const { data: w } = await supabase.from('sm_venue_wines').select('*, sm_master_wines(*, sm_wineries(*))').eq('venue_id', venueId).order('position');
+        setWineData(w || []);
+
+        const { data: a } = await supabase.from('sm_allergens').select('*').order('id');
+        setAllergens(a || []);
+      } catch (e) {
+        console.error("Errore caricamento:", e);
+      } finally {
+        setLoading(false);
+      }
     }
     loadAll();
   }, [venueId]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-white"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-gray-300"></div></div>;
-  if (!venue || !venue.is_active) return <div className="min-h-screen flex items-center justify-center p-6 text-center bg-white text-gray-800 font-sans"><h1>Menù non disponibile</h1></div>;
+  if (!venue || !venue.is_active) return <div className="min-h-screen flex items-center justify-center p-6 text-center bg-white text-gray-800"><h1>Menù non disponibile</h1></div>;
 
+  // Controllo presenza dati per mostrare le tab
   const hasFood = menuData.sections.some(s => s.type === 'food');
   const hasDrinks = menuData.sections.some(s => s.type === 'drink');
   const hasWines = wineData.length > 0;
@@ -107,7 +119,6 @@ export default function PublicMenu() {
               return (
                 <div key={cat} className="space-y-10">
                   <h2 className="text-center text-2xl font-bold text-slate-800 uppercase tracking-[0.2em] border-b-2 border-double border-gray-200 pb-2">{cat}</h2>
-                  {/* GRID LAYOUT: 1 col su mobile, 2 col su tablet+ */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-16">
                     {filteredWines.map(vw => {
                       const wine = vw.sm_master_wines;
@@ -119,7 +130,6 @@ export default function PublicMenu() {
                           <button onClick={() => setSelectedWinery(winery)} className="text-lg font-semibold text-slate-900 hover:text-red-700 transition underline underline-offset-4 mb-1">{winery?.name}</button>
                           <p className="text-md text-red-700 font-medium mb-1">{wine?.region}</p>
                           <p className="text-xl font-bold mb-6">€ {vw.price}</p>
-                          
                           <div className="w-full text-left text-sm space-y-1 border-t border-gray-100 pt-4">
                             {[
                               { label: 'Denominazione', val: wine?.denomination },
@@ -159,20 +169,41 @@ export default function PublicMenu() {
         )}
       </main>
 
-      {/* MODALS - Stile Neutro */}
+      {/* MODAL CANTINA - STRUTTURATO E SCORREVOLE */}
       {selectedWinery && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl max-w-md w-full p-8 relative animate-in fade-in zoom-in duration-300 border-t-8 border-slate-800">
+          <div className="bg-white rounded-3xl max-w-md w-full max-h-[85vh] overflow-y-auto p-8 relative animate-in fade-in zoom-in duration-300 border-t-8 border-slate-800">
             <button onClick={() => setSelectedWinery(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">✕</button>
             <div className="flex justify-center mb-6">
-              {selectedWinery.logo_url ? <img src={selectedWinery.logo_url} className="h-20 object-contain" /> : <div className="h-20 w-20 bg-gray-100 rounded-full" />}
+              {selectedWinery.logo_url ? <img src={selectedWinery.logo_url} className="h-24 object-contain" /> : <div className="h-24 w-24 bg-gray-100 rounded-full" />}
             </div>
-            <h2 className="text-2xl font-bold text-center text-slate-800 mb-4">{selectedWinery.name}</h2>
-            <p className="text-gray-600 text-center leading-relaxed italic">{selectedWinery.description}</p>
+            <h2 className="text-2xl font-bold text-center text-slate-800 mb-6">{selectedWinery.name}</h2>
+            
+            <div className="space-y-4 text-sm">
+              <div className="flex gap-3 items-start">
+                <span className="text-xl">📍</span>
+                <div><span className="font-bold text-slate-700 block">Territorio</span><p className="text-slate-600">{selectedWinery.territory || 'Informazione non disponibile'}</p></div>
+              </div>
+              <div className="flex gap-3 items-start">
+                <span className="text-xl">🌿</span>
+                <div><span className="font-bold text-slate-700 block">Coltura & Filosofia</span><p className="text-slate-600">{selectedWinery.cultivation || 'Informazione non disponibile'}</p></div>
+              </div>
+              {selectedWinery.foundation_year && (
+                <div className="flex gap-3 items-start">
+                  <span className="text-xl">📅</span>
+                  <div><span className="font-bold text-slate-700 block">Fondazione</span><p className="text-slate-600">{selectedWinery.foundation_year}</p></div>
+                </div>
+              )}
+              <div className="pt-4 border-t border-gray-100">
+                <span className="font-bold text-slate-700 block mb-2">Il Racconto</span>
+                <p className="text-slate-600 leading-relaxed italic">{selectedWinery.story || 'Nessun racconto disponibile.'}</p>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
+      {/* MODAL ALLERGENI */}
       {showAllergens && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-md w-full p-8 relative animate-in fade-in zoom-in duration-300 border-t-8 border-slate-800">
