@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export default function VenueMenuPage() {
+  // STATI PRINCIPALI
   const [venues, setVenues] = useState<any[]>([]);
   const [masterWines, setMasterWines] = useState<any[]>([]);
   const [selectedVenue, setSelectedVenue] = useState('');
@@ -11,10 +12,21 @@ export default function VenueMenuPage() {
   const [selectedSection, setSelectedSection] = useState('');
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
+  // FORM SEZIONI
   const [secName, setSecName] = useState('');
   const [secType, setSecType] = useState<'food' | 'drink'>('food');
-  const [itemForm, setItemForm] = useState({ name_it: '', name_en: '', price: '', allergens: '', recommended_wine_id: '', position: 0 });
 
+  // FORM PIATTI/DRINK
+  const [itemForm, setItemForm] = useState({ 
+    name_it: '', 
+    name_en: '', 
+    price: '', 
+    allergens: '', 
+    recommended_wine_id: '', 
+    position: 0 
+  });
+
+  // 1. Caricamento dati iniziali (Locali e Vini Master)
   useEffect(() => { loadInitData(); }, []);
 
   async function loadInitData() {
@@ -24,45 +36,70 @@ export default function VenueMenuPage() {
     setMasterWines(mw || []);
   }
 
+  // 2. Carica le sezioni del locale selezionato
   async function loadMenuData(venueId: string) {
     if (!venueId) return;
     const { data } = await supabase.from('sm_menu_sections').select('*').eq('venue_id', venueId).order('position');
     setSections(data || []);
   }
 
+  // 3. Carica i piatti della sezione selezionata
   async function loadItemsForSection(sectionId: string) {
     if (!sectionId) { setItems([]); return; }
     const { data } = await supabase.from('sm_menu_items').select('*').eq('section_id', sectionId).order('position');
     setItems(data || []);
   }
 
+  // 4. Aggiungi nuova sezione (Primi, Secondi, ecc.)
   async function addSection(e: React.FormEvent) {
     e.preventDefault();
-    const { error } = await supabase.from('sm_menu_sections').insert([{ venue_id: selectedVenue, name: secName, type: secType, position: sections.length + 1 }]);
+    const { error } = await supabase.from('sm_menu_sections').insert([
+      { venue_id: selectedVenue, name: secName, type: secType, position: sections.length + 1 }
+    ]);
     if (error) alert('Errore sezione');
-    else { setSecName(''); loadMenuData(selectedVenue); }
+    else { 
+      setSecName(''); 
+      loadMenuData(selectedVenue); 
+    }
   }
 
+  // 5. Gestione Salva/Modifica Piatto (Il cuore del fix!)
   async function handleSubmitItem(e: React.FormEvent) {
     e.preventDefault();
+    
+    // Prepariamo i dati puliti per il database
     const data = { 
-      ...itemForm, 
+      name_it: itemForm.name_it,
+      name_en: itemForm.name_en,
       price: parseFloat(itemForm.price.replace(',', '.')),
-      section_id: selectedSection 
+      allergens: itemForm.allergens,
+      position: itemForm.position,
+      section_id: selectedSection,
+      // FIX: Se il campo è vuoto, inviamo NULL, non una stringa vuota ""
+      recommended_wine_id: itemForm.recommended_wine_id === '' ? null : itemForm.recommended_wine_id
     };
 
     if (editingItemId) {
+      // MODIFICA
       const { error } = await supabase.from('sm_menu_items').update(data).eq('id', editingItemId);
-      if (error) alert('Errore modifica');
-      else { alert('Piatto aggiornato!'); setEditingItemId(null); }
+      if (error) alert('Errore modifica: ' + error.message);
+      else { 
+        alert('Piatto aggiornato!'); 
+        setEditingItemId(null); 
+      }
     } else {
+      // NUOVO
       const { error } = await supabase.from('sm_menu_items').insert([data]);
-      if (error) alert('Errore inserimento');
+      if (error) alert('Errore inserimento: ' + error.message);
+      else alert('Piatto inserito!');
     }
+    
+    // Reset form
     setItemForm({ name_it: '', name_en: '', price: '', allergens: '', recommended_wine_id: '', position: 0 });
     loadItemsForSection(selectedSection);
   }
 
+  // 6. Carica un piatto nel form per modificarlo
   function startEdit(item: any) {
     setEditingItemId(item.id);
     setItemForm({
@@ -70,17 +107,19 @@ export default function VenueMenuPage() {
       name_en: item.name_en,
       price: item.price.toString(),
       allergens: item.allergens,
-      recommended_wine_id: item.recommended_wine_id,
+      recommended_wine_id: item.recommended_wine_id || '',
       position: item.position
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  // 7. Aggiorna posizione piatto
   async function updateItemPosition(id: string, pos: number) {
     await supabase.from('sm_menu_items').update({ position: pos }).eq('id', id);
     loadItemsForSection(selectedSection);
   }
 
+  // 8. Elimina piatto
   async function deleteItem(id: string) {
     if (confirm('Eliminare questo piatto?')) {
       await supabase.from('sm_menu_items').delete().eq('id', id);
@@ -96,6 +135,7 @@ export default function VenueMenuPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        {/* COLONNA 1: LOCALE E SEZIONI */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white p-6 rounded-xl shadow-sm border">
             <label className="block font-bold mb-2">1. Locale</label>
@@ -127,6 +167,7 @@ export default function VenueMenuPage() {
           )}
         </div>
 
+        {/* COLONNA 2 & 3: GESTIONE PIATTI */}
         <div className="lg:col-span-3">
           {!selectedSection ? (
             <div className="h-full flex items-center justify-center text-gray-400 italic border-2 border-dashed rounded-xl p-20">Seleziona una sezione</div>
