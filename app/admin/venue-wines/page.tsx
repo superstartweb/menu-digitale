@@ -9,9 +9,7 @@ export default function VenueWinesPage() {
   const [venueWines, setVenueWines] = useState<any[]>([]);
   const [searchWine, setSearchWine] = useState('');
 
-  useEffect(() => {
-    loadInitData();
-  }, []);
+  useEffect(() => { loadInitData(); }, []);
 
   async function loadInitData() {
     const { data: v } = await supabase.from('sm_venues').select('*').order('name');
@@ -20,19 +18,18 @@ export default function VenueWinesPage() {
     setMasterWines(mw || []);
   }
 
-  // Carica i vini già associati al locale selezionato
   async function loadVenueWines(venueId: string) {
     if (!venueId) return;
     const { data, error } = await supabase
       .from('sm_venue_wines')
       .select('*, sm_master_wines(*)')
-      .eq('venue_id', venueId);
+      .eq('venue_id', venueId)
+      .order('position');
     
     if (error) console.error(error);
     else setVenueWines(data || []);
   }
 
-  // Funzione per aggiungere un vino al locale
   async function associateWine(wine: any) {
     const price = prompt(`Inserisci il prezzo per ${wine.name} nel locale:`);
     if (price === null) return;
@@ -40,8 +37,8 @@ export default function VenueWinesPage() {
     const { error } = await supabase.from('sm_venue_wines').upsert({
       venue_id: selectedVenue,
       wine_id: wine.id,
-      price: parseFloat(price),
-      category: wine.wine_type, // Prende automaticamente la tipologia dal master!
+      price: parseFloat(price.replace(',', '.')),
+      category: wine.wine_type,
       is_available: true
     });
 
@@ -49,9 +46,14 @@ export default function VenueWinesPage() {
     else loadVenueWines(selectedVenue);
   }
 
+  // FUNZIONE MODIFICA PREZZO IN TEMPO REALE
   async function updatePrice(id: string, newPrice: string) {
-    await supabase.from('sm_venue_wines').update({ price: parseFloat(newPrice) }).eq('id', id);
-    loadVenueWines(selectedVenue);
+    const numericPrice = parseFloat(newPrice.replace(',', '.'));
+    if (isNaN(numericPrice)) return;
+
+    const { error } = await supabase.from('sm_venue_wines').update({ price: numericPrice }).eq('id', id);
+    if (error) alert('Errore aggiornamento prezzo');
+    else loadVenueWines(selectedVenue);
   }
 
   async function toggleAvailability(id: string, current: boolean) {
@@ -70,19 +72,16 @@ export default function VenueWinesPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8">Associazione Vini 🍷</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Associazione Vini 🍷</h1>
+        <button onClick={() => window.history.back()} className="text-blue-600 font-bold text-sm">← Torna Dashboard</button>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* COLONNA SINISTRA: Selezione Locale e Ricerca Master */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white p-6 rounded-xl shadow-sm border">
             <label className="block font-bold mb-2">1. Scegli il Locale</label>
-            <select 
-              className="w-full border p-2 rounded text-black" 
-              value={selectedVenue} 
-              onChange={(e) => { setSelectedVenue(e.target.value); loadVenueWines(e.target.value); }}
-            >
+            <select className="w-full border p-2 rounded text-black" value={selectedVenue} onChange={(e) => { setSelectedVenue(e.target.value); loadVenueWines(e.target.value); }}>
               <option value="">-- Seleziona Locale --</option>
               {venues.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
@@ -91,22 +90,12 @@ export default function VenueWinesPage() {
           {selectedVenue && (
             <div className="bg-white p-6 rounded-xl shadow-sm border">
               <label className="block font-bold mb-2">2. Aggiungi Vino dal Master</label>
-              <input 
-                type="text" 
-                placeholder="Cerca vino nel master..." 
-                className="w-full border p-2 rounded mb-4 text-black" 
-                onChange={(e) => setSearchWine(e.target.value)}
-              />
+              <input type="text" placeholder="Cerca vino nel master..." className="w-full border p-2 rounded mb-4 text-black" onChange={(e) => setSearchWine(e.target.value)} />
               <div className="max-h-96 overflow-y-auto space-y-2">
                 {filteredMaster.map(wine => (
                   <div key={wine.id} className="flex justify-between items-center p-2 hover:bg-gray-50 border rounded group">
                     <span className="text-sm">{wine.name}</span>
-                    <button 
-                      onClick={() => associateWine(wine)}
-                      className="bg-blue-500 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition"
-                    >
-                      + Aggiungi
-                    </button>
+                    <button onClick={() => associateWine(wine)} className="bg-blue-500 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition">+ Aggiungi</button>
                   </div>
                 ))}
               </div>
@@ -114,12 +103,9 @@ export default function VenueWinesPage() {
           )}
         </div>
 
-        {/* COLONNA DESTRA: La Carta Vini del Locale */}
         <div className="lg:col-span-2">
           {!selectedVenue ? (
-            <div className="h-full flex items-center justify-center text-gray-400 italic border-2 border-dashed rounded-xl p-20">
-              Seleziona un locale per gestire la sua carta vini
-            </div>
+            <div className="h-full flex items-center justify-center text-gray-400 italic border-2 border-dashed rounded-xl p-20">Seleziona un locale</div>
           ) : (
             <div className="bg-white p-6 rounded-xl shadow-sm border">
               <h2 className="text-xl font-bold mb-6">Vini associati al locale</h2>
@@ -137,28 +123,24 @@ export default function VenueWinesPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold">€</span>
                         <input 
-                          type="number" 
-                          className="w-20 border p-1 rounded text-center text-black" 
+                          type="text" 
+                          className="w-20 border p-1 rounded text-center text-black font-bold" 
                           value={vw.price} 
                           onChange={(e) => updatePrice(vw.id, e.target.value)}
+                          onBlur={(e) => updatePrice(vw.id, e.target.value)}
                         />
                       </div>
-                      <button 
-                        onClick={() => toggleAvailability(vw.id, vw.is_available)}
-                        className={`px-3 py-1 rounded-full text-xs font-bold ${vw.is_available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
-                      >
+                      <button onClick={() => toggleAvailability(vw.id, vw.is_available)} className={`px-3 py-1 rounded-full text-xs font-bold ${vw.is_available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                         {vw.is_available ? 'Disponibile' : 'Esaurito'}
                       </button>
                       <button onClick={() => dissociateWine(vw.id)} className="text-red-400 hover:text-red-600">🗑️</button>
                     </div>
                   </div>
                 ))}
-                {venueWines.length === 0 && <div className="text-center py-10 text-gray-400">Nessun vino associato. Usa il pannello a sinistra per aggiungerli.</div>}
               </div>
             </div>
           )}
         </div>
-
       </div>
     </div>
   );
