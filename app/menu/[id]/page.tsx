@@ -10,7 +10,10 @@ export default function PublicMenu() {
   const [venue, setVenue] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'food' | 'drink' | 'wine'>('wine');
+  
+  // STATI PER LA NAVIGAZIONE SOTTO-CATEGORIE
   const [activeWineCat, setActiveWineCat] = useState<string>('');
+  const [activeSectionId, setActiveSectionId] = useState<string>('');
   
   const [menuData, setMenuData] = useState<{sections: any[], items: any[]}>({ sections: [], items: [] });
   const [wineData, setWineData] = useState<any[]>([]);
@@ -33,16 +36,16 @@ export default function PublicMenu() {
         const { data: w } = await supabase.from('sm_venue_wines').select('*, sm_master_wines(*, sm_wineries(*))').eq('venue_id', venueId).order('position');
         setWineData(w || []);
 
-        // CARICAMENTO CATEGORIE ORDINATE (per rispettare la posizione dell'admin)
         const { data: cats } = await supabase.from('sm_wine_categories').select('*').order('position');
         setWineCategories(cats || []);
 
         const { data: a } = await supabase.from('sm_allergens').select('*').order('id');
         setAllergens(a || []);
 
-        if (cats && cats.length > 0) {
-          setActiveWineCat(cats[0].name);
-        }
+        // Impostazione default
+        if (cats && cats.length > 0) setActiveWineCat(cats[0].name);
+        if (s && s.length > 0) setActiveSectionId(s[0].id);
+        
       } catch (e) {
         console.error("Errore:", e);
       } finally {
@@ -80,7 +83,7 @@ export default function PublicMenu() {
         <h1 className="text-3xl font-bold text-slate-700 tracking-tight">{venue.name}</h1>
       </header>
 
-      {/* NAV PRINCIPALE */}
+      {/* NAVIGAZIONE PRINCIPALE */}
       <nav className="flex justify-around bg-white border-b sticky top-0 z-20 shadow-sm">
         {hasWines && (
           <button onClick={() => setActiveTab('wine')} className={`flex-1 py-4 text-xs font-bold tracking-widest transition ${activeTab === 'wine' ? 'text-red-900 border-b-2 border-red-900' : 'text-gray-400'}`}>CARTA VINI</button>
@@ -93,66 +96,70 @@ export default function PublicMenu() {
         )}
       </nav>
 
-      {/* SUB-NAV VINI (Identica allo screen) */}
-      {activeTab === 'wine' && (
-        <div className="flex overflow-x-auto bg-white border-b sticky top-[61px] z-20 no-scrollbar shadow-sm border-t-4 border-t-red-900">
-          {wineCategories.map(cat => (
-            <button 
-              key={cat.id} 
-              onClick={() => setActiveWineCat(cat.name)}
-              className={`flex-1 min-w-fit px-6 py-4 text-xs font-black uppercase tracking-widest transition ${activeWineCat === cat.name ? 'text-red-800 bg-red-50 border-b-4 border-red-900' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              {cat.name}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <main className="p-4 max-w-5xl mx-auto">
-        {(activeTab === 'food' || activeTab === 'drink') && (
-          <div className="space-y-12 mt-6">
-            {menuData.sections.filter(s => s.type === activeTab).map(section => (
-              <div key={section.id} className="space-y-6">
-                {/* BOTTONE SEZIONE MODERNO */}
-                <div className="flex justify-center mb-8">
-                  <span className="px-8 py-2 rounded-full bg-slate-800 text-white text-xs font-bold uppercase tracking-widest shadow-md">
-                    {section.name}
-                  </span>
-                </div>
-                
-                {/* GRID PIATTI - FORZATA A 2 COLONNE ANCHE SU MOBILE */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
-                  {menuData.items.filter(item => item.section_id === section.id).map(item => {
-                    const recommendedWine = wineData.find(vw => vw.sm_master_wines?.id === item.recommended_wine_id);
-                    return (
-                      <div key={item.id} className="bg-white p-3 md:p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-full">
-                        <div>
-                          <div className="flex justify-between items-start gap-2 mb-1">
-                            <h3 className="font-bold text-sm md:text-lg text-slate-900 leading-tight">{item.name_it}</h3>
-                            <span className="font-serif font-bold text-sm md:text-lg text-red-900 whitespace-nowrap">€ {item.price}</span>
-                          </div>
-                          <p className="text-[10px] md:text-sm text-gray-500 italic mb-3">{item.name_en}</p>
-                          
-                          <div className="flex flex-col gap-1">
-                            <button onClick={() => setShowAllergens(true)} className="text-[9px] bg-gray-50 text-gray-400 px-2 py-0.5 rounded-md border border-gray-100 text-left">
-                              Allergeni: {item.allergens || 'Nessuno'}
-                            </button>
-                            {recommendedWine && (
-                              <button 
-                                onClick={() => goToRecommendedWine(item.recommended_wine_id)}
-                                className="text-[9px] bg-red-50 text-red-800 px-2 py-0.5 rounded-md border border-red-100 font-bold text-left hover:bg-red-100 transition"
-                              >
-                                🍷 {recommendedWine.sm_master_wines.name}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+      {/* SOTTO-NAVIGAZIONE DINAMICA (Vini, Cibo o Drink) */}
+      <div className="sticky top-[61px] z-20 bg-white border-b shadow-sm overflow-x-auto no-scrollbar">
+        {activeTab === 'wine' && (
+          <div className="flex border-t-4 border-t-red-900">
+            {wineCategories.map(cat => (
+              <button key={cat.id} onClick={() => setActiveWineCat(cat.name)} className={`flex-1 min-w-fit px-6 py-4 text-xs font-black uppercase tracking-widest transition ${activeWineCat === cat.name ? 'text-red-800 bg-red-50 border-b-4 border-red-900' : 'text-gray-400'}`}>
+                {cat.name}
+              </button>
             ))}
+          </div>
+        )}
+
+        {(activeTab === 'food' || activeTab === 'drink') && (
+          <div className="flex justify-center gap-2 p-4">
+            {menuData.sections.filter(s => s.type === activeTab).map(section => (
+              <button 
+                key={section.id} 
+                onClick={() => setActiveSectionId(section.id)}
+                className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition shadow-sm border ${activeSectionId === section.id ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+              >
+                {section.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <main className="p-4 max-w-4xl mx-auto">
+        {(activeTab === 'food' || activeTab === 'drink') && (
+          <div className="mt-6">
+            {/* Mostra solo i piatti della sezione selezionata */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
+              {menuData.items.filter(item => {
+                const section = menuData.sections.find(s => s.id === item.section_id);
+                return section?.id === activeSectionId;
+              }).map(item => {
+                const recommendedWine = wineData.find(vw => vw.sm_master_wines?.id === item.recommended_wine_id);
+                return (
+                  <div key={item.id} className="bg-white p-3 md:p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-full">
+                    <div>
+                      <div className="flex justify-between items-start gap-2 mb-1">
+                        <h3 className="font-bold text-sm md:text-lg text-slate-900 leading-tight">{item.name_it}</h3>
+                        <span className="font-serif font-bold text-sm md:text-lg text-red-900 whitespace-nowrap">€ {item.price}</span>
+                      </div>
+                      <p className="text-[10px] md:text-sm text-gray-500 italic mb-3">{item.name_en}</p>
+                      <div className="flex flex-col gap-1">
+                        <button onClick={() => setShowAllergens(true)} className="text-[9px] bg-gray-50 text-gray-400 px-2 py-0.5 rounded-md border border-gray-100 text-left">
+                          Allergeni: {item.allergens || 'Nessuno'}
+                        </button>
+                        {recommendedWine && (
+                          <button onClick={() => goToRecommendedWine(item.recommended_wine_id)} className="text-[9px] bg-red-50 text-red-800 px-2 py-0.5 rounded-md border border-red-100 font-bold text-left hover:bg-red-100 transition">
+                            🍷 {recommendedWine.sm_master_wines.name}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Messaggio se la sezione è vuota */}
+            {menuData.items.filter(item => item.section_id === activeSectionId).length === 0 && (
+              <div className="text-center py-20 text-gray-400 italic">Nessun piatto in questa sezione.</div>
+            )}
           </div>
         )}
 
@@ -205,7 +212,7 @@ export default function PublicMenu() {
         )}
       </main>
 
-      {/* MODALS e FOOTER (Invariati, già perfetti) */}
+      {/* MODALS e FOOTER (Mantengo quelli lussuosi della versione precedente) */}
       {selectedWinery && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-md w-full max-h-[85vh] overflow-y-auto p-8 relative animate-in fade-in zoom-in duration-300 border-t-8 border-slate-800">
