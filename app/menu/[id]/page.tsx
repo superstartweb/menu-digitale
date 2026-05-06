@@ -41,8 +41,14 @@ export default function PublicMenu() {
         const { data: a } = await supabase.from('sm_allergens').select('*').order('id');
         setAllergens(a || []);
 
-        if (cats && cats.length > 0) setActiveWineCat(cats[0].name);
-        if (s && s.length > 0) setActiveSectionId(s[0].id);
+        // SETTING DEFAULT: Prima categoria/sezione che ha effettivamente dei prodotti
+        if (w && w.length > 0) {
+          setActiveWineCat(w[0].category);
+        }
+        if (s && s.length > 0) {
+          const firstValidSection = s.find(sec => i?.some(item => item.section_id === sec.id));
+          if (firstValidSection) setActiveSectionId(firstValidSection.id);
+        }
       } catch (e) {
         console.error("Errore:", e);
       } finally {
@@ -55,8 +61,13 @@ export default function PublicMenu() {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-white"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-gray-300"></div></div>;
   if (!venue || !venue.is_active) return <div className="min-h-screen flex items-center justify-center p-6 text-center bg-white text-gray-800"><h1>Menù non disponibile</h1></div>;
 
-  const hasFood = menuData.sections.some(s => s.type === 'food');
-  const hasDrinks = menuData.sections.some(s => s.type === 'drink');
+  // --- LOGICA FILTRI CATEGORIE VUOTE ---
+  const activeWineCats = wineCategories.filter(cat => wineData.some(vw => vw.category === cat.name));
+  const activeFoodSections = menuData.sections.filter(s => s.type === 'food' && menuData.items.some(item => item.section_id === s.id));
+  const activeDrinkSections = menuData.sections.filter(s => s.type === 'drink' && menuData.items.some(item => item.section_id === s.id));
+
+  const hasFood = activeFoodSections.length > 0;
+  const hasDrinks = activeDrinkSections.length > 0;
   const hasWines = wineData.length > 0;
 
   const goToRecommendedWine = (wineId: string) => {
@@ -108,7 +119,7 @@ export default function PublicMenu() {
       <div className="sticky top-[61px] z-20 bg-white border-b shadow-sm overflow-x-auto no-scrollbar">
         <div className="flex justify-start gap-2 p-4 px-4">
           {activeTab === 'wine' ? (
-            wineCategories.map(cat => (
+            activeWineCats.map(cat => (
               <button 
                 key={cat.id} 
                 onClick={() => setActiveWineCat(cat.name)}
@@ -118,7 +129,7 @@ export default function PublicMenu() {
               </button>
             ))
           ) : (
-            menuData.sections.filter(s => s.type === activeTab).map(section => (
+            (activeTab === 'food' ? activeFoodSections : activeDrinkSections).map(section => (
               <button 
                 key={section.id} 
                 onClick={() => setActiveSectionId(section.id)}
@@ -133,23 +144,25 @@ export default function PublicMenu() {
 
       <main className="p-4 max-w-2xl mx-auto">
         {(activeTab === 'food' || activeTab === 'drink') && (
-          <div className="space-y-12 mt-6">
+          <div className="mt-6">
             {menuData.sections.filter(s => s.type === activeTab).map(section => {
               const filteredItems = menuData.items.filter(item => 
                 item.section_id === section.id && 
                 (item.name_it.toLowerCase().includes(searchQuery.toLowerCase()) || item.name_en.toLowerCase().includes(searchQuery.toLowerCase()))
               );
-              if (filteredItems.length === 0 && searchQuery !== '') return null;
+
+              // LOGICA CRUCIALE: Se non c'è ricerca, mostra SOLO la sezione selezionata.
+              // Se c'è ricerca, mostra la sezione solo se contiene risultati.
+              if (searchQuery === '' && section.id !== activeSectionId) return null;
+              if (searchQuery !== '' && filteredItems.length === 0) return null;
 
               return (
-                <div key={section.id} className="space-y-6">
-                  {(activeSectionId === section.id || searchQuery === '') && (
-                    <div className="flex justify-center mb-8">
-                      <span className="px-6 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest border border-slate-200">
-                        {section.name}
-                      </span>
-                    </div>
-                  )}
+                <div key={section.id} className="space-y-6 mb-12">
+                  <div className="flex justify-center mb-8">
+                    <span className="px-6 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest border border-slate-200">
+                      {section.name}
+                    </span>
+                  </div>
                   <div className="grid gap-8">
                     {filteredItems.map(item => {
                       const recommendedWine = wineData.find(vw => vw.sm_master_wines?.id === item.recommended_wine_id);
@@ -185,29 +198,20 @@ export default function PublicMenu() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-16">
               {wineData.filter(vw => {
                 const matchesCat = vw.category === activeWineCat;
-                const matchesSearch = vw.sm_master_wines?.name.toLowerCase().includes(searchQuery.toLowerCase()) || vw.sm_master_//region.toLowerCase().includes(searchQuery.toLowerCase());
+                const matchesSearch = vw.sm_master_wines?.name.toLowerCase().includes(searchQuery.toLowerCase()) || vw.sm_master_wines?.region.toLowerCase().includes(searchQuery.toLowerCase());
                 return matchesCat && matchesSearch;
               }).map(vw => {
                 const wine = vw.sm_master_wines;
                 const winery = wine?.sm_wineries;
                 const isAvailable = vw.is_available;
-
                 return (
-                  <div key={vw.id} id={`wine-${vw.sm_master_wines?.id}`} className={`flex flex-col items-center text-center bg-white p-2 transition-all duration-300 ${!isAvailable ? 'opacity-60 grayscale-[0.5]' : ''}`}>
-                    {/* Badge Esaurito */}
+                  <div key={vw.id} id={`wine-${vw.sm_master_wines?.id}`} className={`flex flex-col items-center text-center bg-white p-2 transition-all ${!isAvailable ? 'opacity-60 grayscale-[0.5]' : ''}`}>
                     {!isAvailable && (
-                      <div className="absolute z-10 bg-gray-800 text-white text-[10px] font-black uppercase px-3 py-1 rounded-full mb-2 shadow-lg">
-                        Esaurito
-                      </div>
+                      <div className="absolute z-10 bg-gray-800 text-white text-[10px] font-black uppercase px-3 py-1 rounded-full mb-2 shadow-lg">Esaurito</div>
                     )}
                     <img src={wine?.image_url} className={`h-64 object-contain mb-4 ${!isAvailable ? 'grayscale' : ''}`} alt={wine?.name} />
                     <h3 className="text-2xl font-bold text-red-700 mb-1">{wine?.name}</h3>
-                    <button 
-                      onClick={() => isAvailable && setSelectedWinery(winery)} 
-                      className={`text-lg font-semibold transition underline underline-offset-4 mb-1 ${isAvailable ? 'text-slate-900 hover:text-red-700' : 'text-gray-400 cursor-not-allowed'}`}
-                    >
-                      {winery?.name}
-                    </button>
+                    <button onClick={() => isAvailable && setSelectedWinery(winery)} className={`text-lg font-semibold transition underline underline-offset-4 mb-1 ${isAvailable ? 'text-slate-900 hover:text-red-700' : 'text-gray-400 cursor-not-allowed'}`}>{winery?.name}</button>
                     <p className="text-md text-red-700 font-medium mb-1">{wine?.region}</p>
                     <p className="text-xl font-bold mb-6">€ {vw.price}</p>
                     <div className="w-full text-left text-sm space-y-1 border-t border-gray-100 pt-4">
@@ -246,7 +250,6 @@ export default function PublicMenu() {
         )}
       </main>
 
-      {/* MODALS e FOOTER (Invariati) */}
       {selectedWinery && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-md w-full max-h-[85vh] overflow-y-auto p-8 relative animate-in fade-in zoom-in duration-300 border-t-8 border-slate-800">
