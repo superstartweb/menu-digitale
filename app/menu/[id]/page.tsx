@@ -56,7 +56,7 @@ export default function PublicMenu() {
           if (firstValidSection) setActiveSectionId(firstValidSection.id);
         }
       } catch (e) {
-        console.error("Errore:", e);
+        console.error(e);
       } finally {
         setLoading(false);
       }
@@ -91,7 +91,7 @@ export default function PublicMenu() {
     <div className="min-h-screen bg-white pb-24 text-slate-800 font-sans">
       <header className="pt-12 pb-8 px-4 text-center bg-white">
         <div className="flex justify-center mb-6">
-          {venue.logo_url ? <img src={venue.//logo_url} alt={venue.name} className="h-24 w-auto object-contain" /> : <div className="h-24 w-24 bg-gray-100 rounded-full flex items-center justify-center">No Logo</div>}
+          {venue.logo_url ? <img src={venue.logo_url} alt={venue.name} className="h-24 w-auto object-contain" /> : <div className="h-24 w-24 bg-gray-100 rounded-full flex items-center justify-center">No Logo</div>}
         </div>
         <h1 className="text-3xl font-bold text-slate-700 tracking-tight">{venue.name}</h1>
       </header>
