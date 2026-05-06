@@ -32,17 +32,8 @@ export default function PublicMenu() {
         const { data: i } = await supabase.from('sm_menu_items').select('*').order('position');
         setMenuData({ sections: s || [], items: i || [] });
 
-        const { data: w } = await supabase.from('sm_venue_wines').select('*, sm_master_wines(*, sm_wineries(*))').eq('venue_id', venueId);
-        
-        // ORDINAMENTO: Prima per Cantina, poi per Posizione
-        const sortedWines = (w || []).sort((a, b) => {
-          const wineryA = a.sm_master_wines?.sm_wineries?.name || '';
-          const wineryB = b.sm_master_wines?.sm_wineries?.name || '';
-          if (wineryA < wineryB) return -1;
-          if (wineryA > wineryB) return 1;
-          return (a.position || 0) - (b.position || 0);
-        });
-        setWineData(sortedWines);
+        const { data: w } = await supabase.from('sm_venue_wines').select('*, sm_master_wines(*, sm_wineries(*))').eq('venue_id', venueId).order('position');
+        setWineData(w || []);
 
         const { data: cats } = await supabase.from('sm_wine_categories').select('*').order('position');
         setWineCategories(cats || []);
@@ -50,8 +41,15 @@ export default function PublicMenu() {
         const { data: a } = await supabase.from('sm_allergens').select('*').order('id');
         setAllergens(a || []);
 
-        if (cats && cats.length > 0) setActiveWineCat(cats[0].name);
-        if (s && s.length > 0) setActiveSectionId(s[0].id);
+        // Impostazione default: prima categoria di vino con prodotti
+        if (w && w.length > 0) {
+          setActiveWineCat(w[0].category);
+        }
+        // Impostazione default: prima sezione di cibo con prodotti
+        if (s && s.length > 0) {
+          const firstSectionWithItems = s.find(sec => i?.some(item => item.section_id === sec.id));
+          if (firstSectionWithItems) setActiveSectionId(firstSectionWithItems.id);
+        }
       } catch (e) {
         console.error("Errore:", e);
       } finally {
@@ -64,8 +62,13 @@ export default function PublicMenu() {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-white"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-gray-300"></div></div>;
   if (!venue || !venue.is_active) return <div className="min-h-screen flex items-center justify-center p-6 text-center bg-white text-gray-800"><h1>Menù non disponibile</h1></div>;
 
-  const hasFood = menuData.sections.some(s => s.type === 'food');
-  const hasDrinks = menuData.sections.some(s => s.type === 'drink');
+  // FILTRI PER MOSTRARE SOLO CATEGORIE CON PRODOTTI
+  const activeWineCats = wineCategories.filter(cat => wineData.some(vw => vw.category === cat.name));
+  const activeFoodSections = menuData.sections.filter(s => s.type === 'food' && menuData.items.some(item => item.section_id === s.id));
+  const activeDrinkSections = menuData.sections.filter(s => s.type === 'drink' && menuData.items.some(item => item.section_id === s.id));
+
+  const hasFood = activeFoodSections.length > 0;
+  const hasDrinks = activeDrinkSections.length > 0;
   const hasWines = wineData.length > 0;
 
   const goToRecommendedWine = (wineId: string) => {
@@ -117,7 +120,7 @@ export default function PublicMenu() {
       <div className="sticky top-[61px] z-20 bg-white border-b shadow-sm overflow-x-auto no-scrollbar">
         <div className="flex justify-start gap-2 p-4 px-4">
           {activeTab === 'wine' ? (
-            wineCategories.map(cat => (
+            activeWineCats.map(cat => (
               <button 
                 key={cat.id} 
                 onClick={() => setActiveWineCat(cat.name)}
@@ -127,7 +130,7 @@ export default function PublicMenu() {
               </button>
             ))
           ) : (
-            menuData.sections.filter(s => s.type === activeTab).map(section => (
+            (activeTab === 'food' ? activeFoodSections : activeDrinkSections).map(section => (
               <button 
                 key={section.id} 
                 onClick={() => setActiveSectionId(section.id)}
@@ -142,23 +145,25 @@ export default function PublicMenu() {
 
       <main className="p-4 max-w-2xl mx-auto">
         {(activeTab === 'food' || activeTab === 'drink') && (
-          <div className="space-y-12 mt-6">
+          <div className="mt-6">
+            {/* FILTRO: Se c'è ricerca, mostriamo tutto il matching. Se non c'è, solo la sezione attiva */}
             {menuData.sections.filter(s => s.type === activeTab).map(section => {
               const filteredItems = menuData.items.filter(item => 
                 item.section_id === section.id && 
                 (item.name_it.toLowerCase().includes(searchQuery.toLowerCase()) || item.name_en.toLowerCase().includes(searchQuery.toLowerCase()))
               );
-              if (filteredItems.length === 0 && searchQuery !== '') return null;
+
+              // Se stiamo filtrando per sezione e questa non è l'attiva, o se è vuota durante la ricerca, non mostriamo nulla
+              if (searchQuery === '' && section.id !== activeSectionId) return null;
+              if (searchQuery !== '' && filteredItems.length === 0) return null;
 
               return (
-                <div key={section.id} className="space-y-6">
-                  {(activeSectionId === section.id || searchQuery === '') && (
-                    <div className="flex justify-center mb-8">
-                      <span className="px-6 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest border border-slate-200">
-                        {section.name}
-                      </span>
-                    </div>
-                  )}
+                <div key={section.id} className="space-y-6 mb-12">
+                  <div className="flex justify-center mb-8">
+                    <span className="px-6 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest border border-slate-200">
+                      {section.name}
+                    </span>
+                  </div>
                   <div className="grid gap-8">
                     {filteredItems.map(item => {
                       const recommendedWine = wineData.find(vw => vw.sm_master_wines?.id === item.recommended_wine_id);
@@ -242,6 +247,7 @@ export default function PublicMenu() {
         )}
       </main>
 
+      {/* MODALS e FOOTER (Invariati) */}
       {selectedWinery && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-3xl max-w-md w-full max-h-[85vh] overflow-y-auto p-8 relative animate-in fade-in zoom-in duration-300 border-t-8 border-slate-800">
