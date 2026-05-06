@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 
 export default function PublicMenu() {
   const params = useParams();
-  const venueId = params.id;
+  const venueId = params?.id as string;
 
   const [venue, setVenue] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -24,6 +24,7 @@ export default function PublicMenu() {
 
   useEffect(() => {
     async function loadAll() {
+      if (!venueId) return;
       try {
         const { data: v } = await supabase.from('sm_venues').select('*').eq('id', venueId).single();
         setVenue(v);
@@ -32,8 +33,16 @@ export default function PublicMenu() {
         const { data: i } = await supabase.from('sm_menu_items').select('*').order('position');
         setMenuData({ sections: s || [], items: i || [] });
 
-        const { data: w } = await supabase.from('sm_venue_wines').select('*, sm_master_wines(*, sm_wineries(*))').eq('venue_id', venueId).order('position');
-        setWineData(w || []);
+        const { data: w } = await supabase.from('sm_venue_wines').select('*, sm_master_wines(*, sm_wineries(*))').eq('venue_id', venueId);
+        
+        const sortedWines = (w || []).sort((a, b) => {
+          const nameA = (a.sm_master_wines?.sm_wineries?.name || '').toLowerCase();
+          const nameB = (b.sm_master_wines?.sm_wineries?.name || '').toLowerCase();
+          if (nameA < nameB) return -1;
+          if (nameA > nameB) return 1;
+          return (a.position || 0) - (b.position || 0);
+        });
+        setWineData(sortedWines);
 
         const { data: cats } = await supabase.from('sm_wine_categories').select('*').order('position');
         setWineCategories(cats || []);
@@ -41,10 +50,7 @@ export default function PublicMenu() {
         const { data: a } = await supabase.from('sm_allergens').select('*').order('id');
         setAllergens(a || []);
 
-        // SETTING DEFAULT: Prima categoria/sezione che ha effettivamente dei prodotti
-        if (w && w.length > 0) {
-          setActiveWineCat(w[0].category);
-        }
+        if (cats && cats.length > 0) setActiveWineCat(cats[0].name);
         if (s && s.length > 0) {
           const firstValidSection = s.find(sec => i?.some(item => item.section_id === sec.id));
           if (firstValidSection) setActiveSectionId(firstValidSection.id);
@@ -61,7 +67,6 @@ export default function PublicMenu() {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-white"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-gray-300"></div></div>;
   if (!venue || !venue.is_active) return <div className="min-h-screen flex items-center justify-center p-6 text-center bg-white text-gray-800"><h1>Menù non disponibile</h1></div>;
 
-  // --- LOGICA FILTRI CATEGORIE VUOTE ---
   const activeWineCats = wineCategories.filter(cat => wineData.some(vw => vw.category === cat.name));
   const activeFoodSections = menuData.sections.filter(s => s.type === 'food' && menuData.items.some(item => item.section_id === s.id));
   const activeDrinkSections = menuData.sections.filter(s => s.type === 'drink' && menuData.items.some(item => item.section_id === s.id));
@@ -86,7 +91,7 @@ export default function PublicMenu() {
     <div className="min-h-screen bg-white pb-24 text-slate-800 font-sans">
       <header className="pt-12 pb-8 px-4 text-center bg-white">
         <div className="flex justify-center mb-6">
-          {venue.logo_url ? <img src={venue.logo_url} alt={venue.name} className="h-24 w-auto object-contain" /> : <div className="h-24 w-24 bg-gray-100 rounded-full flex items-center justify-center">No Logo</div>}
+          {venue.logo_url ? <img src={venue.//logo_url} alt={venue.name} className="h-24 w-auto object-contain" /> : <div className="h-24 w-24 bg-gray-100 rounded-full flex items-center justify-center">No Logo</div>}
         </div>
         <h1 className="text-3xl font-bold text-slate-700 tracking-tight">{venue.name}</h1>
       </header>
@@ -144,15 +149,12 @@ export default function PublicMenu() {
 
       <main className="p-4 max-w-2xl mx-auto">
         {(activeTab === 'food' || activeTab === 'drink') && (
-          <div className="mt-6">
+          <div className="space-y-12 mt-6">
             {menuData.sections.filter(s => s.type === activeTab).map(section => {
               const filteredItems = menuData.items.filter(item => 
                 item.section_id === section.id && 
                 (item.name_it.toLowerCase().includes(searchQuery.toLowerCase()) || item.name_en.toLowerCase().includes(searchQuery.toLowerCase()))
               );
-
-              // LOGICA CRUCIALE: Se non c'è ricerca, mostra SOLO la sezione selezionata.
-              // Se c'è ricerca, mostra la sezione solo se contiene risultati.
               if (searchQuery === '' && section.id !== activeSectionId) return null;
               if (searchQuery !== '' && filteredItems.length === 0) return null;
 
